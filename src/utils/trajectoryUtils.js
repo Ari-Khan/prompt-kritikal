@@ -10,7 +10,7 @@ const _mid = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 
 const ALTITUDE = 1.002;
-const JITTER = 1.0;
+const JITTER = 0.75;
 
 function getJitteredVec3(lat, lon, seed = 0, target) {
     const finalSeed = lat * 133.7 + lon * 42.3 + seed;

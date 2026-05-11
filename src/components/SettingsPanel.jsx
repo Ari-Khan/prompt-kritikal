@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import Tooltip from "./Tooltip.jsx";
 
 const TICK_OPTIONS = [
-    { label: "1 tick/sec", value: 1 },
-    { label: "2 ticks/sec", value: 0.5 },
-    { label: "4 ticks/sec", value: 0.25 },
-    { label: "8 ticks/sec", value: 0.125 },
-    { label: "16 ticks/sec", value: 0.0625 },
-    { label: "Smooth", value: 0.03125 },
+    { label: "1 update/sec", value: 1 },
+    { label: "2 updates/sec", value: 0.5 },
+    { label: "4 updates/sec", value: 0.25 },
+    { label: "8 updates/sec", value: 0.125 },
+    { label: "16 updates/sec", value: 0.0625 },
+    { label: "32 updates/sec", value: 0.03125 },
 ];
 
 const TEXTURE_OPTIONS = [
@@ -106,8 +106,8 @@ export default function SettingsPanel({
                 {open && (
                     <div className="settings-body dropup">
                         <SettingRow
-                            label="Tick"
-                            tip="Simulation frequency or Smooth interpolation."
+                            label="VRate"
+                            tip="How often simulation visuals update per second."
                         >
                             <select
                                 value={tickStep}
