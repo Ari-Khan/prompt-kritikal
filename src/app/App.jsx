@@ -43,8 +43,8 @@ function CameraDebug({ controlsRef }) {
                 const target = controls.target;
                 console.log(
                     `Camera Position: [${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}] | ` +
-                    `Target: [${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}] | ` +
-                    `Distance: ${pos.length().toFixed(3)}`
+                        `Target: [${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}] | ` +
+                        `Distance: ${pos.length().toFixed(3)}`
                 );
             }
         };
@@ -68,11 +68,16 @@ const TEXTURES = [
 ];
 
 const CAM_CONFIG = { position: [0, 1.2, 1.8], fov: 60, near: 0.01, far: 1000 };
-const CAM_CONFIG_INTRO = { position: [1.18, 0.77, -0.18], fov: 60, near: 0.01, far: 1000 };
+const CAM_CONFIG_INTRO = {
+    position: [1.18, 0.77, -0.18],
+    fov: 60,
+    near: 0.01,
+    far: 1000,
+};
 const AUTO_ROTATE_DELAY = 5000;
-const AUTO_ROTATE_TARGET = -0.7; // Increased from -0.5 for faster spin
+const AUTO_ROTATE_TARGET = -0.6; // Increased from -0.5 for faster spin
 const AUTO_ROTATE_ACCEL = 0.01;
-const AUTO_ROTATE_SPAWN_DISTANCE = Math.sqrt(0*0 + 1.2*1.2 + 1.8*1.8); // Distance from origin to spawn pos
+const AUTO_ROTATE_SPAWN_DISTANCE = Math.sqrt(0 * 0 + 1.2 * 1.2 + 1.8 * 1.8); // Distance from origin to spawn pos
 
 function useIdleRotation(controlsRef) {
     const idleRef = useRef({
@@ -105,11 +110,13 @@ function useIdleRotation(controlsRef) {
         // Exclude zoom (wheel) and UI interactions (keydown, button clicks)
         const handleMouseDown = (e) => {
             // Only reset if clicking on canvas, not on UI elements
-            if (e.target && e.target.tagName !== 'CANVAS') return;
+            if (e.target && e.target.tagName !== "CANVAS") return;
             resetIdle();
         };
 
-        window.addEventListener("mousedown", handleMouseDown, { passive: true });
+        window.addEventListener("mousedown", handleMouseDown, {
+            passive: true,
+        });
         // touchstart can only happen on the canvas area, so it's safe
         window.addEventListener("touchstart", resetIdle, { passive: true });
 
@@ -131,7 +138,7 @@ function useIdleRotation(controlsRef) {
             // Only reset on rotation (position changes but distance roughly same)
             // Don't reset on pure zoom (distance changes significantly)
             const distDelta = Math.abs(currentDist - lastDistRef.dist);
-            
+
             // If distance changed by more than 0.05, it's likely a zoom - don't reset spin
             if (distDelta < 0.05) {
                 resetIdle();
@@ -150,15 +157,21 @@ function useIdleRotation(controlsRef) {
 
             // Check if camera is at the right distance from origin (not at exact spawn pos, which changes during rotation)
             const camDistFromOrigin = controls.object.position.length();
-            const targetAtOrigin = controls.target.distanceTo(new THREE.Vector3(0, 0, 0));
-            
+            const targetAtOrigin = controls.target.distanceTo(
+                new THREE.Vector3(0, 0, 0)
+            );
+
             // Should be roughly at spawn distance (±0.3) and target at origin
-            const isAtSpawnDistance = Math.abs(camDistFromOrigin - AUTO_ROTATE_SPAWN_DISTANCE) < 0.3;
+            const isAtSpawnDistance =
+                Math.abs(camDistFromOrigin - AUTO_ROTATE_SPAWN_DISTANCE) < 0.3;
             const isTargetAtOrigin = targetAtOrigin < 0.2;
             const isNearSpawn = isAtSpawnDistance && isTargetAtOrigin;
 
             // Only stop rotation if far from spawn distance, not just slightly off
-            if (!isNearSpawn && camDistFromOrigin > AUTO_ROTATE_SPAWN_DISTANCE + 0.5) {
+            if (
+                !isNearSpawn &&
+                camDistFromOrigin > AUTO_ROTATE_SPAWN_DISTANCE + 0.5
+            ) {
                 if (idleRef.current.accelerating) resetIdle();
                 return;
             }
@@ -209,41 +222,45 @@ function useIdleRotation(controlsRef) {
 function useCameraReset(controlsRef, isIntro = false) {
     const animRef = useRef(null);
 
-    const resetCamera = useCallback((targetConfig = null) => {
-        const controls = controlsRef.current;
-        if (!controls) return;
+    const resetCamera = useCallback(
+        (targetConfig = null) => {
+            const controls = controlsRef.current;
+            if (!controls) return;
 
-        if (window.__resetZoomVelocity) window.__resetZoomVelocity();
-        if (animRef.current) cancelAnimationFrame(animRef.current);
+            if (window.__resetZoomVelocity) window.__resetZoomVelocity();
+            if (animRef.current) cancelAnimationFrame(animRef.current);
 
-        const startPos = controls.object.position.clone();
-        const startTarget = controls.target.clone();
-        const config = targetConfig || (isIntro ? CAM_CONFIG_INTRO : CAM_CONFIG);
-        const endPos = new THREE.Vector3(...config.position);
-        const endTarget = new THREE.Vector3(0, 0, 0);
+            const startPos = controls.object.position.clone();
+            const startTarget = controls.target.clone();
+            const config =
+                targetConfig || (isIntro ? CAM_CONFIG_INTRO : CAM_CONFIG);
+            const endPos = new THREE.Vector3(...config.position);
+            const endTarget = new THREE.Vector3(0, 0, 0);
 
-        const startTime = performance.now();
-        const duration = 800;
+            const startTime = performance.now();
+            const duration = 800;
 
-        function tick(now) {
-            const elapsed = Math.min(1, (now - startTime) / duration);
-            const eased =
-                elapsed < 0.5
-                    ? 4 * elapsed * elapsed * elapsed
-                    : 1 - Math.pow(-2 * elapsed + 2, 3) / 2;
+            function tick(now) {
+                const elapsed = Math.min(1, (now - startTime) / duration);
+                const eased =
+                    elapsed < 0.5
+                        ? 4 * elapsed * elapsed * elapsed
+                        : 1 - Math.pow(-2 * elapsed + 2, 3) / 2;
 
-            controls.object.position.lerpVectors(startPos, endPos, eased);
-            controls.target.lerpVectors(startTarget, endTarget, eased);
-            controls.update();
+                controls.object.position.lerpVectors(startPos, endPos, eased);
+                controls.target.lerpVectors(startTarget, endTarget, eased);
+                controls.update();
 
-            if (elapsed < 1) {
-                animRef.current = requestAnimationFrame(tick);
-            } else {
-                animRef.current = null;
+                if (elapsed < 1) {
+                    animRef.current = requestAnimationFrame(tick);
+                } else {
+                    animRef.current = null;
+                }
             }
-        }
-        animRef.current = requestAnimationFrame(tick);
-    }, [controlsRef, isIntro]);
+            animRef.current = requestAnimationFrame(tick);
+        },
+        [controlsRef, isIntro]
+    );
 
     useEffect(
         () => () => {
@@ -336,34 +353,36 @@ export default function App() {
     // Trigger audio initialization on first interaction
     useEffect(() => {
         const triggerAudioInit = () => {
-            const event = new PointerEvent('pointerdown', { bubbles: true });
+            const event = new PointerEvent("pointerdown", { bubbles: true });
             window.dispatchEvent(event);
-            window.removeEventListener('pointerdown', triggerAudioInit);
-            window.removeEventListener('keydown', triggerAudioInit);
+            window.removeEventListener("pointerdown", triggerAudioInit);
+            window.removeEventListener("keydown", triggerAudioInit);
         };
-        window.addEventListener('pointerdown', triggerAudioInit, { once: true });
-        window.addEventListener('keydown', triggerAudioInit, { once: true });
+        window.addEventListener("pointerdown", triggerAudioInit, {
+            once: true,
+        });
+        window.addEventListener("keydown", triggerAudioInit, { once: true });
     }, []);
 
     useIdleRotation(controlsRef);
     const resetCamera = useCameraReset(controlsRef, showIntro);
-    
+
     const introTargetRef = useRef(new THREE.Vector3(-0.23, 0.78, 0.26));
-    
+
     // Lock intro camera target continuously
     useEffect(() => {
         if (!showIntro) return;
-        
+
         const lockTarget = () => {
             if (controlsRef.current) {
                 controlsRef.current.target.copy(introTargetRef.current);
                 controlsRef.current.update();
             }
         };
-        
+
         lockTarget();
         const interval = setInterval(lockTarget, 100);
-        
+
         return () => clearInterval(interval);
     }, [showIntro]);
     const { run, isRunning } = useSimulationWorker(setEvents);
@@ -380,11 +399,11 @@ export default function App() {
 
     const handleEnterSituationRoom = useCallback(() => {
         // Fade out intro text
-        const introElement = document.querySelector('.intro-content');
+        const introElement = document.querySelector(".intro-content");
         if (introElement) {
-            introElement.classList.add('fade-out');
+            introElement.classList.add("fade-out");
         }
-        
+
         // After fade, hide intro and animate camera smoothly
         setTimeout(() => {
             setShowIntro(false);
@@ -392,7 +411,7 @@ export default function App() {
             requestAnimationFrame(() => {
                 setShowUI(true);
             });
-            
+
             // Animate camera from intro position to normal position
             if (controlsRef.current) {
                 const startPos = controlsRef.current.object.position.clone();
@@ -404,14 +423,23 @@ export default function App() {
 
                 const animateCamera = (now) => {
                     const elapsed = Math.min(1, (now - startTime) / duration);
-                    const eased = elapsed < 0.5
-                        ? 4 * elapsed * elapsed * elapsed
-                        : 1 - Math.pow(-2 * elapsed + 2, 3) / 2;
-                    
-                    controlsRef.current.object.position.lerpVectors(startPos, endPos, eased);
-                    controlsRef.current.target.lerpVectors(startTarget, endTarget, eased);
+                    const eased =
+                        elapsed < 0.5
+                            ? 4 * elapsed * elapsed * elapsed
+                            : 1 - Math.pow(-2 * elapsed + 2, 3) / 2;
+
+                    controlsRef.current.object.position.lerpVectors(
+                        startPos,
+                        endPos,
+                        eased
+                    );
+                    controlsRef.current.target.lerpVectors(
+                        startTarget,
+                        endTarget,
+                        eased
+                    );
                     controlsRef.current.update();
-                    
+
                     if (elapsed < 1) {
                         requestAnimationFrame(animateCamera);
                     }
@@ -498,25 +526,29 @@ export default function App() {
     return (
         <div className="app-container">
             <LoadingScreen isLoading={isLoading} />
-            
+
             {!showIntro && (
                 <div className={`fps-counter-fade ${showUI ? "show" : ""}`}>
                     <FpsCounter />
                 </div>
             )}
-            
+
             {showIntro && <IntroScreen onEnter={handleEnterSituationRoom} />}
 
             {!uiHidden && !showIntro && (
                 <>
-                    <div className={`control-panel-fade ${showUI ? "show" : ""}`}>
+                    <div
+                        className={`control-panel-fade ${showUI ? "show" : ""}`}
+                    >
                         <ControlPanel
                             nations={world.nations}
                             onRun={run}
                             isRunning={isRunning}
                         />
                     </div>
-                    <div className={`settings-panel-fade ${showUI ? "show" : ""}`}>
+                    <div
+                        className={`settings-panel-fade ${showUI ? "show" : ""}`}
+                    >
                         <SettingsPanel
                             tickStep={tickStep}
                             onTickStepChange={setTickStep}
@@ -535,13 +567,18 @@ export default function App() {
 
             {!showIntro && (
                 <div className="time-controls">
-                    <div className="time-display">T+{Math.floor(displayTick)}</div>
+                    <div className="time-display">
+                        T+{Math.floor(displayTick)}
+                    </div>
                     <button className="hide-ui-button" onClick={toggleUI}>
                         {uiHidden ? "Show UI" : "Hide UI"}
                     </button>
                     {!uiHidden && (
                         <>
-                            <button className="pause-button" onClick={togglePause}>
+                            <button
+                                className="pause-button"
+                                onClick={togglePause}
+                            >
                                 {isPaused ? "Resume" : "Pause"}
                             </button>
                             <button
@@ -568,7 +605,10 @@ export default function App() {
             >
                 <CameraDebug controlsRef={controlsRef} />
                 <Skybox postEffectsEnabled={postEffectsEnabled} />
-                <Audio enabled={soundEnabled} onAudioLoaded={handleAudioLoaded} />
+                <Audio
+                    enabled={soundEnabled}
+                    onAudioLoaded={handleAudioLoaded}
+                />
                 <ambientLight intensity={0.5} />
                 <directionalLight position={[5, 5, 5]} intensity={1.0} />
 
@@ -595,7 +635,7 @@ export default function App() {
                     />
 
                     {showGeo && <CountryBorders />}
-                    
+
                     {!showIntro && showGeo && (
                         <>
                             <CountryFill
@@ -608,7 +648,7 @@ export default function App() {
 
                 <Globe textureName={earthTexture} />
                 <Atmosphere />
-                
+
                 {/* Show all cities on all screens, including intro and loading */}
                 <Cities nations={world.nations} />
 

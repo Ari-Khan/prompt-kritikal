@@ -112,7 +112,7 @@ body {
     left: 16px;
     z-index: 1000;
     width: 180px;
-    background: rgba(15, 15, 20, 0.95);
+    background: #000;
     border: 2px solid #00ff00;
     box-shadow:
         0 0 20px rgba(0, 255, 0, 0.3),
@@ -131,34 +131,32 @@ body {
     left: 16px;
     z-index: 1000;
     width: 180px;
-    background: rgba(15, 15, 20, 0.95);
-    border: 2px solid #00ff00;
-    box-shadow:
-        0 0 20px rgba(0, 255, 0, 0.3),
-        inset 0 0 10px rgba(0, 255, 0, 0.1);
-    backdrop-filter: blur(8px);
-    padding: 8px;
-    border-radius: 4px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    padding: 0;
+    border-radius: 0;
     display: inline-block;
 }
 .settings-toggle {
     width: 100%;
     padding: 10px 12px;
-    background: #006600;
+    background: #000;
     color: #0f0;
     border: 2px solid #00ff00;
-    border-radius: 3px;
+    border-radius: 4px;
     font-family: monospace;
     font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
     cursor: pointer;
     box-shadow:
-        0 0 12px rgba(0, 255, 0, 0.3),
-        inset 0 0 5px rgba(0, 255, 0, 0.2);
+        0 0 20px rgba(0, 255, 0, 0.3),
+        inset 0 0 10px rgba(0, 255, 0, 0.1);
 }
 .settings-toggle:hover {
-    background: #008800;
+    background: #111;
 }
 .settings-body {
     position: absolute;
@@ -222,14 +220,18 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    flex: 1;
+    min-width: 0;
+    margin-left: -15px;
 }
 .settings-row select {
     background: #000;
     color: #0f0;
     border: 1px solid #00ff00;
-    padding: 3px 6px;
+    padding: 3px 24px 3px 6px;
     font-family: monospace;
-    width: 78px;
+    width: 100%;
+    min-width: 50px;
     font-size: 11px;
     line-height: 1;
 }
@@ -407,7 +409,7 @@ body {
 .time-display {
     grid-column: 1 / 2;
     grid-row: 1 / 2;
-    background: rgba(0, 0, 0, 0.9);
+    background: #000;
     border: 2px solid #00ff00;
     color: #0f0;
     padding: 12px 16px;
@@ -428,7 +430,7 @@ body {
     top: 16px;
     left: 16px;
     z-index: 1200;
-    background: rgba(0, 0, 0, 0.85);
+    background: #000;
     color: #0f0;
     border: 2px solid #00ff00;
     border-radius: 4px;
@@ -472,7 +474,7 @@ body {
 }
 .control-rect {
     padding: 12px 16px;
-    background: #006600;
+    background: #000;
     color: #0f0;
     border: 2px solid #00ff00;
     border-radius: 4px;
@@ -545,7 +547,7 @@ body {
 .hide-ui-button,
 .pause-button,
 .reset-button {
-    background: #006600;
+    background: #000;
     color: #0f0;
     border: 2px solid #00ff00;
     border-radius: 4px;
@@ -566,7 +568,7 @@ body {
 .hide-ui-button:hover,
 .pause-button:hover,
 .reset-button:hover {
-    background: #008800;
+    background: #111;
     box-shadow: 0 0 25px rgba(0, 255, 0, 0.5);
 }
 .hide-ui-button:active,
@@ -627,12 +629,12 @@ body {
 }
 
 .intro-title {
-    font-family: 'Stalinist One', serif;
+    font-family: "Stalinist One", serif;
     font-size: 72px;
     font-weight: 400;
     letter-spacing: 12px;
     color: #00ff00;
-    text-shadow: 
+    text-shadow:
         0 0 10px rgba(0, 255, 0, 0.5),
         0 0 20px rgba(0, 255, 0, 0.3),
         0 0 30px rgba(0, 255, 0, 0.2),
@@ -646,14 +648,15 @@ body {
 }
 
 @keyframes intro-title-glow {
-    0%, 100% {
-        text-shadow: 
+    0%,
+    100% {
+        text-shadow:
             0 0 10px rgba(0, 255, 0, 0.6),
             0 0 20px rgba(0, 255, 0, 0.4),
             2px 2px 0px rgba(0, 0, 0, 0.5);
     }
     50% {
-        text-shadow: 
+        text-shadow:
             0 0 12px rgba(0, 255, 0, 0.6),
             0 0 22px rgba(0, 255, 0, 0.4),
             2px 2px 0px rgba(0, 0, 0, 0.5);
@@ -663,32 +666,30 @@ body {
 .intro-button {
     font-family: monospace;
     padding: 16px 24px;
-    background-color: #666666;
-    color: #fff;
-    border: 1px solid rgba(102, 102, 102, 0.18);
+    background-color: #000;
+    color: #00ff00;
+    border: 2px solid #00ff00;
     border-radius: 3px;
     font-size: 16px;
     font-weight: 900;
     letter-spacing: 1.5px;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.36);
+    box-shadow: none;
     transition: all 0.3s ease;
     position: relative;
 }
 
 .intro-button:hover {
-    box-shadow:
-        0 14px 30px rgba(102, 102, 102, 0.28),
-        0 0 18px rgba(102, 102, 102, 0.22);
-    border-color: rgba(102, 102, 102, 0.36);
+    border-color: #00ff00;
+    transform: translateX(12px);
 }
 
 .intro-button:active {
     box-shadow:
         inset 0 1px 0 rgba(0, 0, 0, 0.12),
         0 6px 16px rgba(0, 0, 0, 0.45);
-    background-color: #555555;
+    background-color: #111;
 }
 
 .intro-button:focus-visible {
@@ -708,7 +709,9 @@ body {
     z-index: 1000;
     opacity: 0;
     transform: translateY(20px);
-    transition: opacity 0.8s ease, transform 0.8s ease;
+    transition:
+        opacity 0.8s ease,
+        transform 0.8s ease;
     pointer-events: none;
 }
 
@@ -730,7 +733,9 @@ body {
     z-index: 1000;
     opacity: 0;
     transform: translateY(20px);
-    transition: opacity 0.8s ease 0.1s, transform 0.8s ease 0.1s;
+    transition:
+        opacity 0.8s ease 0.1s,
+        transform 0.8s ease 0.1s;
     pointer-events: none;
 }
 

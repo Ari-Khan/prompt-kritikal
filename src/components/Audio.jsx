@@ -36,13 +36,20 @@ export default function AmbientAudio({ enabled = true, onAudioLoaded }) {
         // Track when audio is loaded
         const handleCanPlayThrough = (key) => () => {
             loadedRef.current[key] = true;
-            if (loadedRef.current.space && loadedRef.current.ground && onAudioLoaded) {
+            if (
+                loadedRef.current.space &&
+                loadedRef.current.ground &&
+                onAudioLoaded
+            ) {
                 onAudioLoaded();
             }
         };
 
         space.addEventListener("canplaythrough", handleCanPlayThrough("space"));
-        ground.addEventListener("canplaythrough", handleCanPlayThrough("ground"));
+        ground.addEventListener(
+            "canplaythrough",
+            handleCanPlayThrough("ground")
+        );
 
         const handleInteraction = () => {
             if (!enabledRef.current) return;
@@ -69,8 +76,14 @@ export default function AmbientAudio({ enabled = true, onAudioLoaded }) {
         return () => {
             window.removeEventListener("pointerdown", handleInteraction);
             window.removeEventListener("keydown", handleInteraction);
-            space.removeEventListener("canplaythrough", handleCanPlayThrough("space"));
-            ground.removeEventListener("canplaythrough", handleCanPlayThrough("ground"));
+            space.removeEventListener(
+                "canplaythrough",
+                handleCanPlayThrough("space")
+            );
+            ground.removeEventListener(
+                "canplaythrough",
+                handleCanPlayThrough("ground")
+            );
             space.pause();
             ground.pause();
             space.src = "";
