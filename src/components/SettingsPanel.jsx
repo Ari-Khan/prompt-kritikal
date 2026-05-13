@@ -89,8 +89,6 @@ export default function SettingsPanel({
 
     return (
         <>
-            <FPSCounter />
-
             <div
                 className="settings-panel"
                 onMouseOver={handleHover}

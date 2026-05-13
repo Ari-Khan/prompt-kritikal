@@ -8,6 +8,43 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
+
+.loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.6s ease;
+}
+
+.loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+    display: none;
+}
+
+.loading-bar-container {
+    width: 60%;
+    max-width: 500px;
+    height: 8px;
+    background-color: rgba(0, 255, 0, 0.1);
+    border: 2px solid #00ff00;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.loading-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff00, #00aa00);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+    transition: width 0.3s ease;
+}
 a {
     font-weight: 500;
     color: #646cff;
@@ -412,7 +449,7 @@ body {
     font-size: 16px;
     padding: 12px 16px;
     box-shadow: 0 0 12px rgba(0, 255, 0, 0.2);
-    width: 104px;
+    width: auto;
     height: 48px;
     display: flex;
     align-items: center;
@@ -420,6 +457,21 @@ body {
     gap: 6px;
     box-sizing: border-box;
     pointer-events: none;
+}
+
+.fps-counter-fade {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 1200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.8s ease;
+}
+
+.fps-counter-fade.show {
+    opacity: 1;
+    pointer-events: auto;
 }
 .fps-label {
     width: 40px;
@@ -554,4 +606,176 @@ body {
     font-family: monospace;
     pointer-events: auto;
     box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+}
+
+/* Intro Screen Styles */
+.intro-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 60px;
+}
+
+.intro-content {
+    position: absolute;
+    top: 80px;
+    left: 60px;
+    transform: none;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 40px;
+    z-index: 2001;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+.intro-content.fade-out {
+    opacity: 0;
+}
+
+.intro-title {
+    font-family: 'Stalinist One', serif;
+    font-size: 72px;
+    font-weight: 400;
+    letter-spacing: 12px;
+    color: #00ff00;
+    text-shadow: 
+        0 0 10px rgba(0, 255, 0, 0.5),
+        0 0 20px rgba(0, 255, 0, 0.3),
+        0 0 30px rgba(0, 255, 0, 0.2),
+        3px 3px 0px rgba(0, 0, 0, 0.8);
+    margin: 0;
+    line-height: 1.1;
+    text-transform: uppercase;
+    animation: intro-title-glow 3s ease-in-out infinite;
+    max-width: 600px;
+    word-spacing: 100vw;
+}
+
+@keyframes intro-title-glow {
+    0%, 100% {
+        text-shadow: 
+            0 0 10px rgba(0, 255, 0, 0.5),
+            0 0 20px rgba(0, 255, 0, 0.3),
+            0 0 30px rgba(0, 255, 0, 0.2),
+            2px 2px 0px rgba(0, 0, 0, 0.5);
+    }
+    50% {
+        text-shadow: 
+            0 0 20px rgba(0, 255, 0, 0.7),
+            0 0 40px rgba(0, 255, 0, 0.5),
+            0 0 60px rgba(0, 255, 0, 0.3),
+            2px 2px 0px rgba(0, 0, 0, 0.5);
+    }
+}
+
+.intro-button {
+    font-family: 'Stalinist One', serif;
+    padding: 18px 40px;
+    background: linear-gradient(135deg, #006600, #004400);
+    color: #00ff00;
+    border: 3px solid #00ff00;
+    border-radius: 0px;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 
+        0 0 15px rgba(0, 255, 0, 0.4),
+        inset 0 0 10px rgba(0, 255, 0, 0.1);
+    transition: all 0.3s ease;
+    text-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+    position: relative;
+    overflow: hidden;
+}
+
+.intro-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.3), transparent);
+    transition: left 0.5s ease;
+}
+
+.intro-button:hover {
+    background: linear-gradient(135deg, #008800, #006600);
+    box-shadow: 
+        0 0 30px rgba(0, 255, 0, 0.8),
+        inset 0 0 20px rgba(0, 255, 0, 0.2),
+        0 8px 16px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
+}
+
+.intro-button:hover::before {
+    left: 100%;
+}
+
+.intro-button:active {
+    transform: translateY(0);
+    box-shadow: 
+        0 0 20px rgba(0, 255, 0, 0.6),
+        inset 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.intro-button:focus-visible {
+    outline: 2px solid #00ff00;
+    outline-offset: 2px;
+}
+
+.intro-canvas {
+    position: fixed !important;
+    inset: 0 !important;
+}
+
+/* Fade-in animations for control panels */
+.control-panel-fade {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    pointer-events: none;
+}
+
+.control-panel-fade.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.control-panel-fade .control-panel {
+    position: static;
+    width: 180px;
+}
+
+.settings-panel-fade {
+    position: fixed;
+    bottom: 280px;
+    left: 16px;
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.8s ease 0.1s, transform 0.8s ease 0.1s;
+    pointer-events: none;
+}
+
+.settings-panel-fade.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.settings-panel-fade .settings-panel {
+    position: static;
 }

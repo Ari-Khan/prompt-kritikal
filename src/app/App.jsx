@@ -23,12 +23,38 @@ import SettingsPanel from "../components/SettingsPanel.jsx";
 import SmoothZoom from "../components/SmoothZoom.jsx";
 import Audio from "../components/Audio.jsx";
 import PostEffects from "../components/PostEffects.jsx";
+import IntroScreen from "../components/IntroScreen.jsx";
+import LoadingScreen from "../components/LoadingScreen.jsx";
+import FpsCounter from "../components/FpsCounter.jsx";
 
 import { useEventTimeline } from "../hooks/useEventTimeline.js";
 import { loadWorld } from "../utils/loadData.js";
 
 import "../index.css";
 import settings from "../config/settings.json";
+
+// Debug component to log camera and controls data
+function CameraDebug({ controlsRef }) {
+    useEffect(() => {
+        const logCameraData = () => {
+            if (controlsRef.current) {
+                const controls = controlsRef.current;
+                const pos = controls.object.position;
+                const target = controls.target;
+                console.log(
+                    `Camera Position: [${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}] | ` +
+                    `Target: [${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}] | ` +
+                    `Distance: ${pos.length().toFixed(3)}`
+                );
+            }
+        };
+
+        const interval = setInterval(logCameraData, 500);
+        return () => clearInterval(interval);
+    }, [controlsRef]);
+
+    return null;
+}
 
 const world = loadWorld();
 
@@ -42,9 +68,11 @@ const TEXTURES = [
 ];
 
 const CAM_CONFIG = { position: [0, 1.2, 1.8], fov: 60, near: 0.01, far: 1000 };
+const CAM_CONFIG_INTRO = { position: [1.18, 0.77, -0.18], fov: 60, near: 0.01, far: 1000 };
 const AUTO_ROTATE_DELAY = 5000;
-const AUTO_ROTATE_TARGET = -0.5;
+const AUTO_ROTATE_TARGET = -0.7; // Increased from -0.5 for faster spin
 const AUTO_ROTATE_ACCEL = 0.01;
+const AUTO_ROTATE_SPAWN_DISTANCE = Math.sqrt(0*0 + 1.2*1.2 + 1.8*1.8); // Distance from origin to spawn pos
 
 function useIdleRotation(controlsRef) {
     const idleRef = useRef({
@@ -73,19 +101,46 @@ function useIdleRotation(controlsRef) {
     }, [controlsRef]);
 
     useEffect(() => {
-        const events = ["keydown", "mousedown", "wheel", "touchstart"];
-        events.forEach((e) =>
-            window.addEventListener(e, resetIdle, { passive: true })
-        );
-        return () =>
-            events.forEach((e) => window.removeEventListener(e, resetIdle));
+        // Only reset on meaningful interactions with the 3D scene
+        // Exclude zoom (wheel) and UI interactions (keydown, button clicks)
+        const handleMouseDown = (e) => {
+            // Only reset if clicking on canvas, not on UI elements
+            if (e.target && e.target.tagName !== 'CANVAS') return;
+            resetIdle();
+        };
+
+        window.addEventListener("mousedown", handleMouseDown, { passive: true });
+        // touchstart can only happen on the canvas area, so it's safe
+        window.addEventListener("touchstart", resetIdle, { passive: true });
+
+        return () => {
+            window.removeEventListener("mousedown", handleMouseDown);
+            window.removeEventListener("touchstart", resetIdle);
+        };
     }, [resetIdle]);
 
     useEffect(() => {
         const controls = controlsRef.current;
         if (!controls) return;
-        controls.addEventListener("start", resetIdle);
-        return () => controls.removeEventListener("start", resetIdle);
+
+        // Track last known distance to detect zoom vs rotation
+        const lastDistRef = { dist: controls.object.position.length() };
+
+        const handleChange = () => {
+            const currentDist = controls.object.position.length();
+            // Only reset on rotation (position changes but distance roughly same)
+            // Don't reset on pure zoom (distance changes significantly)
+            const distDelta = Math.abs(currentDist - lastDistRef.dist);
+            
+            // If distance changed by more than 0.05, it's likely a zoom - don't reset spin
+            if (distDelta < 0.05) {
+                resetIdle();
+            }
+            lastDistRef.dist = currentDist;
+        };
+
+        controls.addEventListener("change", handleChange);
+        return () => controls.removeEventListener("change", handleChange);
     }, [resetIdle, controlsRef]);
 
     useEffect(() => {
@@ -93,15 +148,17 @@ function useIdleRotation(controlsRef) {
             const controls = controlsRef.current;
             if (!controls) return;
 
-            const dist = controls.object.position.distanceTo(
-                new THREE.Vector3(...CAM_CONFIG.position)
-            );
-            const targetDist = controls.target.distanceTo(
-                new THREE.Vector3(0, 0, 0)
-            );
-            const isNearSpawn = dist < 0.15 && targetDist < 0.1;
+            // Check if camera is at the right distance from origin (not at exact spawn pos, which changes during rotation)
+            const camDistFromOrigin = controls.object.position.length();
+            const targetAtOrigin = controls.target.distanceTo(new THREE.Vector3(0, 0, 0));
+            
+            // Should be roughly at spawn distance (±0.3) and target at origin
+            const isAtSpawnDistance = Math.abs(camDistFromOrigin - AUTO_ROTATE_SPAWN_DISTANCE) < 0.3;
+            const isTargetAtOrigin = targetAtOrigin < 0.2;
+            const isNearSpawn = isAtSpawnDistance && isTargetAtOrigin;
 
-            if (!isNearSpawn) {
+            // Only stop rotation if far from spawn distance, not just slightly off
+            if (!isNearSpawn && camDistFromOrigin > AUTO_ROTATE_SPAWN_DISTANCE + 0.5) {
                 if (idleRef.current.accelerating) resetIdle();
                 return;
             }
@@ -112,7 +169,7 @@ function useIdleRotation(controlsRef) {
             )
                 return;
 
-            if (!idleRef.current.accelerating) {
+            if (!idleRef.current.accelerating && isNearSpawn) {
                 idleRef.current.accelerating = true;
                 idleRef.current.speed = 0;
                 controls.autoRotate = true;
@@ -149,10 +206,10 @@ function useIdleRotation(controlsRef) {
     }, [resetIdle, controlsRef]);
 }
 
-function useCameraReset(controlsRef) {
+function useCameraReset(controlsRef, isIntro = false) {
     const animRef = useRef(null);
 
-    const resetCamera = useCallback(() => {
+    const resetCamera = useCallback((targetConfig = null) => {
         const controls = controlsRef.current;
         if (!controls) return;
 
@@ -161,7 +218,8 @@ function useCameraReset(controlsRef) {
 
         const startPos = controls.object.position.clone();
         const startTarget = controls.target.clone();
-        const endPos = new THREE.Vector3(...CAM_CONFIG.position);
+        const config = targetConfig || (isIntro ? CAM_CONFIG_INTRO : CAM_CONFIG);
+        const endPos = new THREE.Vector3(...config.position);
         const endTarget = new THREE.Vector3(0, 0, 0);
 
         const startTime = performance.now();
@@ -185,7 +243,7 @@ function useCameraReset(controlsRef) {
             }
         }
         animRef.current = requestAnimationFrame(tick);
-    }, [controlsRef]);
+    }, [controlsRef, isIntro]);
 
     useEffect(
         () => () => {
@@ -241,6 +299,11 @@ function useSimulationWorker(onEvents) {
 }
 
 export default function App() {
+    const [isLoading, setIsLoading] = useState(true);
+    const [audioLoaded, setAudioLoaded] = useState(false);
+    const [minLoadTimeReached, setMinLoadTimeReached] = useState(false);
+    const [showIntro, setShowIntro] = useState(true);
+    const [showUI, setShowUI] = useState(false);
     const [events, setEvents] = useState(null);
     const [tickStep, setTickStep] = useState(settings.tickStep);
     const [isPaused, setIsPaused] = useState(false);
@@ -270,8 +333,39 @@ export default function App() {
         return () => clearTimeout(id);
     }, []);
 
+    // Trigger audio initialization on first interaction
+    useEffect(() => {
+        const triggerAudioInit = () => {
+            const event = new PointerEvent('pointerdown', { bubbles: true });
+            window.dispatchEvent(event);
+            window.removeEventListener('pointerdown', triggerAudioInit);
+            window.removeEventListener('keydown', triggerAudioInit);
+        };
+        window.addEventListener('pointerdown', triggerAudioInit, { once: true });
+        window.addEventListener('keydown', triggerAudioInit, { once: true });
+    }, []);
+
     useIdleRotation(controlsRef);
-    const resetCamera = useCameraReset(controlsRef);
+    const resetCamera = useCameraReset(controlsRef, showIntro);
+    
+    const introTargetRef = useRef(new THREE.Vector3(-0.23, 0.78, 0.26));
+    
+    // Lock intro camera target continuously
+    useEffect(() => {
+        if (!showIntro) return;
+        
+        const lockTarget = () => {
+            if (controlsRef.current) {
+                controlsRef.current.target.copy(introTargetRef.current);
+                controlsRef.current.update();
+            }
+        };
+        
+        lockTarget();
+        const interval = setInterval(lockTarget, 100);
+        
+        return () => clearInterval(interval);
+    }, [showIntro]);
     const { run, isRunning } = useSimulationWorker(setEvents);
 
     const { visible, currentTick } = useEventTimeline(
@@ -283,6 +377,49 @@ export default function App() {
     );
 
     const displayTick = currentTick;
+
+    const handleEnterSituationRoom = useCallback(() => {
+        // Fade out intro text
+        const introElement = document.querySelector('.intro-content');
+        if (introElement) {
+            introElement.classList.add('fade-out');
+        }
+        
+        // After fade, hide intro and animate camera smoothly
+        setTimeout(() => {
+            setShowIntro(false);
+            // Stagger showUI to trigger fade animation
+            requestAnimationFrame(() => {
+                setShowUI(true);
+            });
+            
+            // Animate camera from intro position to normal position
+            if (controlsRef.current) {
+                const startPos = controlsRef.current.object.position.clone();
+                const startTarget = controlsRef.current.target.clone();
+                const endPos = new THREE.Vector3(...CAM_CONFIG.position);
+                const endTarget = new THREE.Vector3(0, 0, 0);
+                const startTime = performance.now();
+                const duration = 1200;
+
+                const animateCamera = (now) => {
+                    const elapsed = Math.min(1, (now - startTime) / duration);
+                    const eased = elapsed < 0.5
+                        ? 4 * elapsed * elapsed * elapsed
+                        : 1 - Math.pow(-2 * elapsed + 2, 3) / 2;
+                    
+                    controlsRef.current.object.position.lerpVectors(startPos, endPos, eased);
+                    controlsRef.current.target.lerpVectors(startTarget, endTarget, eased);
+                    controlsRef.current.update();
+                    
+                    if (elapsed < 1) {
+                        requestAnimationFrame(animateCamera);
+                    }
+                };
+                requestAnimationFrame(animateCamera);
+            }
+        }, 400);
+    }, [controlsRef]);
 
     const affectedIsos = useMemo(() => {
         if (!visible.length) return [];
@@ -335,51 +472,90 @@ export default function App() {
     const toggleUI = () => setUiHidden((p) => !p);
     const togglePause = () => setIsPaused((p) => !p);
 
+    // Enforce minimum load time
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setMinLoadTimeReached(true);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // Hide loading screen when both audio is loaded AND minimum time has passed
+    useEffect(() => {
+        if (audioLoaded && minLoadTimeReached) {
+            setIsLoading(false);
+        }
+    }, [audioLoaded, minLoadTimeReached]);
+
+    // Stable callback for audio loaded event
+    const handleAudioLoaded = useCallback(() => {
+        setAudioLoaded(true);
+    }, []);
+
+    // Initialize camera based on showIntro state
+    const initialCamera = showIntro ? CAM_CONFIG_INTRO : CAM_CONFIG;
+
     return (
         <div className="app-container">
-            {!uiHidden && (
+            <LoadingScreen isLoading={isLoading} />
+            
+            {!showIntro && (
+                <div className={`fps-counter-fade ${showUI ? "show" : ""}`}>
+                    <FpsCounter />
+                </div>
+            )}
+            
+            {showIntro && <IntroScreen onEnter={handleEnterSituationRoom} />}
+
+            {!uiHidden && !showIntro && (
                 <>
-                    <ControlPanel
-                        nations={world.nations}
-                        onRun={run}
-                        isRunning={isRunning}
-                    />
-                    <SettingsPanel
-                        tickStep={tickStep}
-                        onTickStepChange={setTickStep}
-                        performanceSettings={perfSettings}
-                        onPerformanceChange={setPerfSettings}
-                        texture={earthTexture}
-                        onTextureChange={setEarthTexture}
-                        soundEnabled={soundEnabled}
-                        onSoundChange={setSoundEnabled}
-                        postEffectsEnabled={postEffectsEnabled}
-                        onPostEffectsChange={setPostEffectsEnabled}
-                    />
+                    <div className={`control-panel-fade ${showUI ? "show" : ""}`}>
+                        <ControlPanel
+                            nations={world.nations}
+                            onRun={run}
+                            isRunning={isRunning}
+                        />
+                    </div>
+                    <div className={`settings-panel-fade ${showUI ? "show" : ""}`}>
+                        <SettingsPanel
+                            tickStep={tickStep}
+                            onTickStepChange={setTickStep}
+                            performanceSettings={perfSettings}
+                            onPerformanceChange={setPerfSettings}
+                            texture={earthTexture}
+                            onTextureChange={setEarthTexture}
+                            soundEnabled={soundEnabled}
+                            onSoundChange={setSoundEnabled}
+                            postEffectsEnabled={postEffectsEnabled}
+                            onPostEffectsChange={setPostEffectsEnabled}
+                        />
+                    </div>
                 </>
             )}
 
-            <div className="time-controls">
-                <div className="time-display">T+{Math.floor(displayTick)}</div>
-                <button className="hide-ui-button" onClick={toggleUI}>
-                    {uiHidden ? "Show UI" : "Hide UI"}
-                </button>
-                {!uiHidden && (
-                    <>
-                        <button className="pause-button" onClick={togglePause}>
-                            {isPaused ? "Resume" : "Pause"}
-                        </button>
-                        <button
-                            className="pause-button reset-button"
-                            onClick={resetCamera}
-                        >
-                            Reset Cam
-                        </button>
-                    </>
-                )}
-            </div>
+            {!showIntro && (
+                <div className="time-controls">
+                    <div className="time-display">T+{Math.floor(displayTick)}</div>
+                    <button className="hide-ui-button" onClick={toggleUI}>
+                        {uiHidden ? "Show UI" : "Hide UI"}
+                    </button>
+                    {!uiHidden && (
+                        <>
+                            <button className="pause-button" onClick={togglePause}>
+                                {isPaused ? "Resume" : "Pause"}
+                            </button>
+                            <button
+                                className="pause-button reset-button"
+                                onClick={() => resetCamera(CAM_CONFIG)}
+                            >
+                                Reset Cam
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
 
-            {!uiHidden && logDisplay && (
+            {!showIntro && !uiHidden && logDisplay && (
                 <pre className="event-log">{logDisplay}</pre>
             )}
 
@@ -388,34 +564,40 @@ export default function App() {
                 className="canvas-3d"
                 dpr={[1, perfSettings.pixelRatioLimit]}
                 gl={glConfig}
-                camera={CAM_CONFIG}
+                camera={initialCamera}
             >
+                <CameraDebug controlsRef={controlsRef} />
                 <Skybox postEffectsEnabled={postEffectsEnabled} />
-                <Audio enabled={soundEnabled} />
+                <Audio enabled={soundEnabled} onAudioLoaded={handleAudioLoaded} />
                 <ambientLight intensity={0.5} />
                 <directionalLight position={[5, 5, 5]} intensity={1.0} />
 
                 <Suspense fallback={null}>
-                    <ArcManager
-                        events={visible}
-                        nations={world.nations}
-                        displayTime={displayTick}
-                        simTime={currentTick}
-                    />
-                    <ExplosionManager
-                        events={visible}
-                        nations={world.nations}
-                        displayTime={displayTick}
-                    />
+                    {!showIntro && (
+                        <>
+                            <ArcManager
+                                events={visible}
+                                nations={world.nations}
+                                displayTime={displayTick}
+                                simTime={currentTick}
+                            />
+                            <ExplosionManager
+                                events={visible}
+                                nations={world.nations}
+                                displayTime={displayTick}
+                            />
+                        </>
+                    )}
 
                     <PostEffects
                         enabled={postEffectsEnabled}
                         multisampling={perfSettings.antialias ? 4 : 0}
                     />
 
-                    {showGeo && (
+                    {showGeo && <CountryBorders />}
+                    
+                    {!showIntro && showGeo && (
                         <>
-                            <CountryBorders />
                             <Cities nations={world.nations} />
                             <CountryFill
                                 activeIsos={affectedIsos}

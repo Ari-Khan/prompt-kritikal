@@ -7,11 +7,12 @@ const CROSS_PORTION = 0.08;
 const SMOOTHING = 0.08;
 const INITIAL_FADE_DURATION = 5000;
 
-export default function AmbientAudio({ enabled = true }) {
+export default function AmbientAudio({ enabled = true, onAudioLoaded }) {
     const spaceRef = useRef(null);
     const groundRef = useRef(null);
     const volumes = useRef({ space: 0, ground: 0 });
     const initialFade = useRef({ space: null, ground: null });
+    const loadedRef = useRef({ space: false, ground: false });
     const { camera } = useThree();
 
     const enabledRef = useRef(enabled);
@@ -31,6 +32,17 @@ export default function AmbientAudio({ enabled = true }) {
 
         spaceRef.current = space;
         groundRef.current = ground;
+
+        // Track when audio is loaded
+        const handleCanPlayThrough = (key) => () => {
+            loadedRef.current[key] = true;
+            if (loadedRef.current.space && loadedRef.current.ground && onAudioLoaded) {
+                onAudioLoaded();
+            }
+        };
+
+        space.addEventListener("canplaythrough", handleCanPlayThrough("space"));
+        ground.addEventListener("canplaythrough", handleCanPlayThrough("ground"));
 
         const handleInteraction = () => {
             if (!enabledRef.current) return;
@@ -57,6 +69,8 @@ export default function AmbientAudio({ enabled = true }) {
         return () => {
             window.removeEventListener("pointerdown", handleInteraction);
             window.removeEventListener("keydown", handleInteraction);
+            space.removeEventListener("canplaythrough", handleCanPlayThrough("space"));
+            ground.removeEventListener("canplaythrough", handleCanPlayThrough("ground"));
             space.pause();
             ground.pause();
             space.src = "";
