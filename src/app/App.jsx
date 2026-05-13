@@ -598,7 +598,6 @@ export default function App() {
                     
                     {!showIntro && showGeo && (
                         <>
-                            <Cities nations={world.nations} />
                             <CountryFill
                                 activeIsos={affectedIsos}
                                 nations={world.nations}
@@ -609,6 +608,9 @@ export default function App() {
 
                 <Globe textureName={earthTexture} />
                 <Atmosphere />
+                
+                {/* Show all cities on all screens, including intro and loading */}
+                <Cities nations={world.nations} />
 
                 <OrbitControls
                     ref={controlsRef}
