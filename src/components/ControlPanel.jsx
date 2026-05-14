@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 
 export default function ControlPanel({ nations, onRun, isRunning = false }) {
     const { allCodes, aggressorCodes } = useMemo(() => {
@@ -10,21 +10,32 @@ export default function ControlPanel({ nations, onRun, isRunning = false }) {
         return { allCodes: codes, aggressorCodes: aggressors };
     }, [nations]);
 
-    const [actor, setActor] = useState(() => aggressorCodes[0] || "");
+    const [actor, setActor] = useState(() => aggressorCodes[0] ?? "");
     const [target, setTarget] = useState(
-        () => allCodes.find((c) => c !== (aggressorCodes[0] || "")) || ""
+        () => allCodes.find((c) => c !== (aggressorCodes[0] ?? "")) ?? ""
     );
+
+    const targetCodes = useMemo(
+        () => allCodes.filter((c) => c !== actor),
+        [allCodes, actor]
+    );
+
+    useEffect(() => {
+        if (target === actor) {
+            setTarget(targetCodes[0] ?? "");
+        }
+    }, [actor, target, targetCodes]);
 
     const error = useMemo(() => {
         if (aggressorCodes.length === 0) return "No armed nations found.";
-        if (!actor || !target || actor === target)
-            return "Select different countries.";
-        return null;
-    }, [actor, target, aggressorCodes.length]);
 
-    const handleRun = () => {
+        if (!actor || !target) return "Select different countries.";
+        return null;
+    }, [actor, target, aggressorCodes]);
+
+    const handleRun = useCallback(() => {
         if (!error && !isRunning) onRun(actor, target);
-    };
+    }, [error, isRunning, onRun, actor, target]);
 
     return (
         <div className={`control-panel ${isRunning ? "running-fade" : ""}`}>
@@ -48,7 +59,7 @@ export default function ControlPanel({ nations, onRun, isRunning = false }) {
                     value={target}
                     onChange={(e) => setTarget(e.target.value)}
                 >
-                    {allCodes.map((c) => (
+                    {targetCodes.map((c) => (
                         <option key={c} value={c}>
                             {nations[c]?.name || c}
                         </option>

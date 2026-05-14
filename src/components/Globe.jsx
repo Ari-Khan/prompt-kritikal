@@ -6,7 +6,6 @@ const GEOM = new THREE.SphereGeometry(1, 64, 64);
 export default function Globe({ textureName = "specular.avif" }) {
     const earthTexture = useTexture(`/textures/${textureName}`, (texture) => {
         texture.anisotropy = 4;
-        texture.generateMipmaps = true;
         texture.minFilter = THREE.LinearMipmapLinearFilter;
     });
 

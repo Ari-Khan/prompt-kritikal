@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, memo } from "react";
+﻿import { useEffect, useRef, useState, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
     EffectComposer,
@@ -18,12 +18,13 @@ const BLUR_SCALE = 15.0;
 
 const sampleDelayMs = (meanSeconds) => {
     const u = Math.random() * Math.random() * Math.random();
-    return -Math.log(u || 0.0001) * (Math.max(0, meanSeconds * 1000) / 3);
+    return -Math.log(u || 0.0001) * ((meanSeconds * 1000) / 3);
 };
 
 const PostEffects = memo(({ enabled = true, multisampling = 0 }) => {
     const glitchRef = useRef();
     const blurRef = useRef();
+    const glitchOffRef = useRef(null);
 
     const internal = useRef({
         spawnTime: -1,
@@ -46,11 +47,15 @@ const PostEffects = memo(({ enabled = true, multisampling = 0 }) => {
                     glitchRef.current
                 ) {
                     glitchRef.current.mode = GlitchMode.CONSTANT_MILD;
-                    setTimeout(() => {
+
+                    glitchOffRef.current = setTimeout(() => {
                         if (glitchRef.current)
                             glitchRef.current.mode = GlitchMode.DISABLED;
+
+                        glitchOffRef.current = null;
                     }, 500);
                 }
+
                 scheduleGlitch();
             }, sampleDelayMs(GLITCH_MEAN_SECONDS));
         };
@@ -65,30 +70,42 @@ const PostEffects = memo(({ enabled = true, multisampling = 0 }) => {
         scheduleGlitch();
         scheduleBlur();
 
-        const currentInternal = internal.current;
         return () => {
-            clearTimeout(currentInternal.glitchTimer);
-            clearTimeout(currentInternal.blurTimer);
+            clearTimeout(internal.current.glitchTimer);
+            clearTimeout(internal.current.blurTimer);
+            clearTimeout(glitchOffRef.current);
         };
     }, [enabled]);
 
     useFrame(() => {
-        if (!enabled) return;
+        if (
+            !enabled ||
+            internal.current.blurStartTime === -1 ||
+            !blurRef.current
+        ) {
+            return;
+        }
 
-        if (internal.current.blurStartTime !== -1 && blurRef.current) {
-            const elapsed = performance.now() - internal.current.blurStartTime;
-            const t = elapsed / BLUR_DURATION_MS;
+        const elapsed = performance.now() - internal.current.blurStartTime;
+        const t = elapsed / BLUR_DURATION_MS;
 
-            if (t >= 1) {
-                blurRef.current.bokehScale = 0;
-                internal.current.blurStartTime = -1;
+        if (t >= 1) {
+            blurRef.current.bokehScale = 0;
+            internal.current.blurStartTime = -1;
+        } else {
+            let ramp;
+
+            if (t < BLUR_RISE_PORTION) {
+                ramp = t / BLUR_RISE_PORTION;
             } else {
-                const ramp =
-                    t < BLUR_RISE_PORTION
-                        ? t / BLUR_RISE_PORTION
-                        : 1 - (t - BLUR_RISE_PORTION) / (1 - BLUR_RISE_PORTION);
-                blurRef.current.bokehScale = BLUR_SCALE * ramp;
+                ramp = 1 - (t - BLUR_RISE_PORTION) / (1 - BLUR_RISE_PORTION);
             }
+
+            ramp = Math.max(0, ramp);
+
+            ramp = ramp * ramp * (3 - 2 * ramp);
+
+            blurRef.current.bokehScale = BLUR_SCALE * ramp;
         }
     });
 
@@ -101,6 +118,7 @@ const PostEffects = memo(({ enabled = true, multisampling = 0 }) => {
                 blendFunction={BlendFunction.NORMAL}
                 premultiply
             />
+
             <DepthOfField
                 ref={blurRef}
                 focusDistance={0}
@@ -108,7 +126,9 @@ const PostEffects = memo(({ enabled = true, multisampling = 0 }) => {
                 bokehScale={0}
                 focalLength={0.02}
             />
+
             <Scanline density={1.3} opacity={0.05} />
+
             <Glitch
                 ref={glitchRef}
                 mode={GlitchMode.DISABLED}

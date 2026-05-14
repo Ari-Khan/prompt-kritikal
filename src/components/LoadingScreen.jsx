@@ -12,7 +12,8 @@ export default function LoadingScreen({ isLoading }) {
         const interval = setInterval(() => {
             setProgress((prev) => {
                 if (prev >= 90) return prev;
-                return prev + Math.random() * 30;
+
+                return Math.min(90, prev + Math.random() * 30);
             });
         }, 200);
 
@@ -25,7 +26,7 @@ export default function LoadingScreen({ isLoading }) {
                 <div
                     className="loading-bar"
                     style={{ width: `${progress}%` }}
-                ></div>
+                />
             </div>
         </div>
     );

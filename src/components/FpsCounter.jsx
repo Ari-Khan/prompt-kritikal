@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function FpsCounter() {
-    const [fps, setFps] = useState(0);
+    const [fps] = useState(0);
+    const fpsRef = useRef(fps);
+    const rafRef = useRef();
+    const [, rerender] = useState(0);
 
     useEffect(() => {
         let frameCount = 0;
@@ -9,26 +12,27 @@ export default function FpsCounter() {
 
         const tick = () => {
             frameCount++;
-            const currentTime = performance.now();
-            const delta = currentTime - lastTime;
+            const now = performance.now();
+            const delta = now - lastTime;
 
             if (delta >= 1000) {
-                setFps(Math.round((frameCount * 1000) / delta));
+                fpsRef.current = Math.round((frameCount * 1000) / delta);
                 frameCount = 0;
-                lastTime = currentTime;
+                lastTime = now;
+                rerender((n) => n + 1);
             }
 
-            requestAnimationFrame(tick);
+            rafRef.current = requestAnimationFrame(tick);
         };
 
-        const id = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(id);
+        rafRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafRef.current);
     }, []);
 
     return (
         <div className="fps-box">
             <div className="fps-label">FPS:</div>
-            <div className="fps-value">{fps}</div>
+            <div className="fps-value">{fpsRef.current}</div>
         </div>
     );
 }

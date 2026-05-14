@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { computeTrajectory } from "../utils/trajectoryUtils.js";
@@ -16,6 +16,7 @@ export default function ExplosionManager({
     displayTime,
 }) {
     const meshRef = useRef();
+    const processedCache = useRef(new Map());
 
     const mat = useMemo(
         () =>
@@ -27,13 +28,23 @@ export default function ExplosionManager({
         []
     );
 
+    useEffect(() => () => mat.dispose(), [mat]);
+
     const processedEvents = useMemo(() => {
-        if (!events || !nations) return [];
-        return events
-            .filter(
-                (e) => e.type === "launch" && nations[e.from] && nations[e.to]
-            )
-            .map((e) => {
+        if (!events?.length || !nations) {
+            processedCache.current.clear();
+            return [];
+        }
+
+        const cache = processedCache.current;
+        const result = [];
+
+        for (const e of events) {
+            if (e.type !== "launch" || !nations[e.from] || !nations[e.to])
+                continue;
+
+            const key = e.id ?? `${e.from}-${e.to}-${e.t}`;
+            if (!cache.has(key)) {
                 const traj = computeTrajectory({
                     fromLat: e.fromLat ?? nations[e.from].lat,
                     fromLon: e.fromLon ?? nations[e.from].lon,
@@ -45,49 +56,54 @@ export default function ExplosionManager({
                 const count = Math.max(1, Number(e.count) || 1);
                 const seed = e.t * 13.37 + count * 7.77;
                 const rand = Math.abs(Math.sin(seed * 12.9898));
-
-                return {
+                cache.set(key, {
                     impactTick: e.t + traj.duration,
                     position: traj.end,
                     sizeMult:
                         (0.1 + Math.pow(count, 0.65) * 0.35) *
                         (0.8 + rand * 0.4),
-                };
-            });
+                });
+            }
+            result.push(cache.get(key));
+        }
+        return result;
     }, [events, nations]);
 
     useFrame(() => {
         const mesh = meshRef.current;
         if (!mesh) return;
 
-        const time = displayTime;
         let renderedCount = 0;
 
-        for (let i = 0; i < processedEvents.length; i++) {
-            if (renderedCount >= MAX_EXPLOSIONS) break;
-
+        for (
+            let i = 0;
+            i < processedEvents.length && renderedCount < MAX_EXPLOSIONS;
+            i++
+        ) {
             const e = processedEvents[i];
-            const progress = (time - e.impactTick) / FADE_WINDOW;
+            const progress = (displayTime - e.impactTick) / FADE_WINDOW;
+            if (progress < 0 || progress > 1) continue;
 
-            if (progress >= 0 && progress <= 1) {
-                const scale = (0.001 + 0.03 * progress) * e.sizeMult;
-                const opacity = Math.pow(1 - progress, 2.0);
+            const scale = (0.001 + 0.02 * progress) * e.sizeMult;
 
-                DUMMY.position.copy(e.position);
-                DUMMY.scale.setScalar(scale);
-                DUMMY.updateMatrix();
-                mesh.setMatrixAt(renderedCount, DUMMY.matrix);
+            const opacity = (1 - progress) * (1 - progress);
 
-                TEMP_COLOR.copy(BASE_COLOR).multiplyScalar(opacity);
-                mesh.setColorAt(renderedCount, TEMP_COLOR);
+            DUMMY.position.copy(e.position);
+            DUMMY.scale.setScalar(scale);
+            DUMMY.updateMatrix();
+            mesh.setMatrixAt(renderedCount, DUMMY.matrix);
 
-                renderedCount++;
-            }
+            TEMP_COLOR.copy(BASE_COLOR).multiplyScalar(opacity);
+            mesh.setColorAt(renderedCount, TEMP_COLOR);
+
+            renderedCount++;
         }
 
         mesh.count = renderedCount;
-        mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+        mesh.instanceMatrix.needsUpdate = renderedCount > 0;
+        if (mesh.instanceColor)
+            mesh.instanceColor.needsUpdate = renderedCount > 0;
     });
 
     return (
