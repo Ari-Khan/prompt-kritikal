@@ -9,7 +9,6 @@ export default function LoadingScreen({ isLoading }) {
             return;
         }
 
-        // Gradually increase progress while loading
         const interval = setInterval(() => {
             setProgress((prev) => {
                 if (prev >= 90) return prev;

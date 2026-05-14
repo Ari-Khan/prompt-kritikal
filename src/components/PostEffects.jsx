@@ -9,7 +9,7 @@ import {
 } from "@react-three/postprocessing";
 import { BlendFunction, GlitchMode } from "postprocessing";
 
-const STARTUP_GRACE = 7000;
+const STARTUP_GRACE = 10000;
 const GLITCH_MEAN_SECONDS = 60;
 const BLUR_MEAN_SECONDS = 60;
 const BLUR_DURATION_MS = 3000;
@@ -113,9 +113,9 @@ const PostEffects = memo(({ enabled = true, multisampling = 0 }) => {
                 ref={glitchRef}
                 mode={GlitchMode.DISABLED}
                 delay={[10, 60]}
-                duration={[0.5, 0.8]}
-                strength={[0.3, 0.6]}
-                ratio={0.28}
+                duration={[0.4, 0.7]}
+                strength={[0.3, 0.5]}
+                ratio={0.25}
             />
         </EffectComposer>
     );

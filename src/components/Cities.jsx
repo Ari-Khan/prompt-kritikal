@@ -1,9 +1,9 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import { latLonToVec3 } from "../utils/latLonToVec3.js";
 
 const DUMMY = new THREE.Object3D();
-const LOW_POLY_SPHERE = new THREE.IcosahedronGeometry(1, 1);
+const CITY_GEOMETRY = new THREE.IcosahedronGeometry(1, 1);
 
 export default function Cities({ nations = {} }) {
     const meshRef = useRef();
@@ -11,31 +11,30 @@ export default function Cities({ nations = {} }) {
 
     const spots = useMemo(() => {
         const out = [];
-        const nationEntries = Object.entries(nations);
 
-        for (let i = 0; i < nationEntries.length; i++) {
-            const [, N] = nationEntries[i];
+        for (const N of Object.values(nations)) {
             if (!N) continue;
-
-            const baseColor = new THREE.Color(N.defaultColor ?? "#ffffff");
+            const color = new THREE.Color(N.defaultColor ?? "#ffffff");
 
             if (N.lat !== undefined && N.lon !== undefined) {
+                const size = N.size ?? 0.003;
                 out.push({
                     pos: latLonToVec3(N.lat, N.lon, 1.001),
-                    color: baseColor,
-                    size: N.size ?? 0.003,
+                    color,
+                    size,
+                    bloomSize: size * 2.2,
                 });
             }
 
-            const cities = N.majorCities;
-            if (cities) {
-                for (let j = 0; j < cities.length; j++) {
-                    const c = cities[j];
+            if (N.majorCities) {
+                for (const c of N.majorCities) {
                     if (c?.lat !== undefined && c?.lon !== undefined) {
+                        const size = c.size ?? 0.002;
                         out.push({
                             pos: latLonToVec3(c.lat, c.lon, 1.001),
-                            color: baseColor,
-                            size: c.size ?? 0.002,
+                            color,
+                            size,
+                            bloomSize: size * 2.2,
                         });
                     }
                 }
@@ -50,19 +49,19 @@ export default function Cities({ nations = {} }) {
         if (!mesh || !bloom || spots.length === 0) return;
 
         for (let i = 0; i < spots.length; i++) {
-            const s = spots[i];
+            const { pos, color, size, bloomSize } = spots[i];
 
-            DUMMY.position.copy(s.pos);
+            DUMMY.position.copy(pos);
 
-            DUMMY.scale.setScalar(s.size);
+            DUMMY.scale.setScalar(size);
             DUMMY.updateMatrix();
             mesh.setMatrixAt(i, DUMMY.matrix);
-            mesh.setColorAt(i, s.color);
+            mesh.setColorAt(i, color);
 
-            DUMMY.scale.setScalar(s.size * 2.2);
+            DUMMY.scale.setScalar(bloomSize);
             DUMMY.updateMatrix();
             bloom.setMatrixAt(i, DUMMY.matrix);
-            bloom.setColorAt(i, s.color);
+            bloom.setColorAt(i, color);
         }
 
         mesh.instanceMatrix.needsUpdate = true;
@@ -71,18 +70,19 @@ export default function Cities({ nations = {} }) {
         if (bloom.instanceColor) bloom.instanceColor.needsUpdate = true;
     }, [spots]);
 
+    if (spots.length === 0) return null;
+
     return (
         <group>
             <instancedMesh
                 ref={meshRef}
-                args={[LOW_POLY_SPHERE, null, spots.length]}
+                args={[CITY_GEOMETRY, null, spots.length]}
             >
                 <meshBasicMaterial transparent depthWrite={false} />
             </instancedMesh>
-
             <instancedMesh
                 ref={bloomRef}
-                args={[LOW_POLY_SPHERE, null, spots.length]}
+                args={[CITY_GEOMETRY, null, spots.length]}
             >
                 <meshBasicMaterial
                     transparent

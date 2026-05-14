@@ -33,29 +33,6 @@ import { loadWorld } from "../utils/loadData.js";
 import "../index.css";
 import settings from "../config/settings.json";
 
-// Debug component to log camera and controls data
-function CameraDebug({ controlsRef }) {
-    useEffect(() => {
-        const logCameraData = () => {
-            if (controlsRef.current) {
-                const controls = controlsRef.current;
-                const pos = controls.object.position;
-                const target = controls.target;
-                console.log(
-                    `Camera Position: [${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}] | ` +
-                        `Target: [${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}] | ` +
-                        `Distance: ${pos.length().toFixed(3)}`
-                );
-            }
-        };
-
-        const interval = setInterval(logCameraData, 500);
-        return () => clearInterval(interval);
-    }, [controlsRef]);
-
-    return null;
-}
-
 const world = loadWorld();
 
 const TEXTURES = [
@@ -74,28 +51,29 @@ const CAM_CONFIG_INTRO = {
     near: 0.01,
     far: 1000,
 };
+
+const INTRO_TARGET = new THREE.Vector3(-0.23, 0.78, 0.26);
+const ORIGIN = new THREE.Vector3(0, 0, 0);
+
 const AUTO_ROTATE_DELAY = 5000;
-const AUTO_ROTATE_TARGET = -0.6; // Increased from -0.5 for faster spin
+const AUTO_ROTATE_TARGET = -0.6;
 const AUTO_ROTATE_ACCEL = 0.01;
-const AUTO_ROTATE_SPAWN_DISTANCE = Math.sqrt(0 * 0 + 1.2 * 1.2 + 1.8 * 1.8); // Distance from origin to spawn pos
+const AUTO_ROTATE_SPAWN_DISTANCE = Math.sqrt(1.2 * 1.2 + 1.8 * 1.8);
 
 function useIdleRotation(controlsRef) {
     const idleRef = useRef({
-        lastActivity: 0,
+        lastActivity: performance.now(),
         accelerating: false,
         raf: null,
         speed: 0,
     });
 
-    useEffect(() => {
-        idleRef.current.lastActivity = performance.now();
-    }, []);
-
     const resetIdle = useCallback(() => {
         idleRef.current.lastActivity = performance.now();
-        if (controlsRef.current) {
-            controlsRef.current.autoRotate = false;
-            controlsRef.current.autoRotateSpeed = 0;
+        const controls = controlsRef.current;
+        if (controls) {
+            controls.autoRotate = false;
+            controls.autoRotateSpeed = 0;
         }
         if (idleRef.current.raf) {
             cancelAnimationFrame(idleRef.current.raf);
@@ -106,22 +84,14 @@ function useIdleRotation(controlsRef) {
     }, [controlsRef]);
 
     useEffect(() => {
-        // Only reset on meaningful interactions with the 3D scene
-        // Exclude zoom (wheel) and UI interactions (keydown, button clicks)
-        const handleMouseDown = (e) => {
-            // Only reset if clicking on canvas, not on UI elements
-            if (e.target && e.target.tagName !== "CANVAS") return;
+        const onMouseDown = (e) => {
+            if (e.target?.tagName !== "CANVAS") return;
             resetIdle();
         };
-
-        window.addEventListener("mousedown", handleMouseDown, {
-            passive: true,
-        });
-        // touchstart can only happen on the canvas area, so it's safe
+        window.addEventListener("mousedown", onMouseDown, { passive: true });
         window.addEventListener("touchstart", resetIdle, { passive: true });
-
         return () => {
-            window.removeEventListener("mousedown", handleMouseDown);
+            window.removeEventListener("mousedown", onMouseDown);
             window.removeEventListener("touchstart", resetIdle);
         };
     }, [resetIdle]);
@@ -130,24 +100,17 @@ function useIdleRotation(controlsRef) {
         const controls = controlsRef.current;
         if (!controls) return;
 
-        // Track last known distance to detect zoom vs rotation
-        const lastDistRef = { dist: controls.object.position.length() };
+        let lastDist = controls.object.position.length();
 
-        const handleChange = () => {
-            const currentDist = controls.object.position.length();
-            // Only reset on rotation (position changes but distance roughly same)
-            // Don't reset on pure zoom (distance changes significantly)
-            const distDelta = Math.abs(currentDist - lastDistRef.dist);
-
-            // If distance changed by more than 0.05, it's likely a zoom - don't reset spin
-            if (distDelta < 0.05) {
-                resetIdle();
-            }
-            lastDistRef.dist = currentDist;
+        const onControlsChange = () => {
+            const dist = controls.object.position.length();
+            const delta = Math.abs(dist - lastDist);
+            if (delta < 0.05) resetIdle();
+            lastDist = dist;
         };
 
-        controls.addEventListener("change", handleChange);
-        return () => controls.removeEventListener("change", handleChange);
+        controls.addEventListener("change", onControlsChange);
+        return () => controls.removeEventListener("change", onControlsChange);
     }, [resetIdle, controlsRef]);
 
     useEffect(() => {
@@ -155,23 +118,15 @@ function useIdleRotation(controlsRef) {
             const controls = controlsRef.current;
             if (!controls) return;
 
-            // Check if camera is at the right distance from origin (not at exact spawn pos, which changes during rotation)
-            const camDistFromOrigin = controls.object.position.length();
-            const targetAtOrigin = controls.target.distanceTo(
-                new THREE.Vector3(0, 0, 0)
-            );
+            const camDist = controls.object.position.length();
+            const targetDist = controls.target.distanceTo(ORIGIN);
 
-            // Should be roughly at spawn distance (±0.3) and target at origin
-            const isAtSpawnDistance =
-                Math.abs(camDistFromOrigin - AUTO_ROTATE_SPAWN_DISTANCE) < 0.3;
-            const isTargetAtOrigin = targetAtOrigin < 0.2;
-            const isNearSpawn = isAtSpawnDistance && isTargetAtOrigin;
+            const nearSpawnDist =
+                Math.abs(camDist - AUTO_ROTATE_SPAWN_DISTANCE) < 0.3;
+            const targetAtOrigin = targetDist < 0.2;
+            const isNearSpawn = nearSpawnDist && targetAtOrigin;
 
-            // Only stop rotation if far from spawn distance, not just slightly off
-            if (
-                !isNearSpawn &&
-                camDistFromOrigin > AUTO_ROTATE_SPAWN_DISTANCE + 0.5
-            ) {
+            if (!isNearSpawn && camDist > AUTO_ROTATE_SPAWN_DISTANCE + 0.5) {
                 if (idleRef.current.accelerating) resetIdle();
                 return;
             }
@@ -190,24 +145,24 @@ function useIdleRotation(controlsRef) {
                 const step = () => {
                     if (!idleRef.current.accelerating) return;
 
-                    const delta =
-                        idleRef.current.speed < AUTO_ROTATE_TARGET
-                            ? AUTO_ROTATE_ACCEL
-                            : -AUTO_ROTATE_ACCEL;
+                    const diff = AUTO_ROTATE_TARGET - idleRef.current.speed;
 
-                    if (
-                        Math.abs(idleRef.current.speed - AUTO_ROTATE_TARGET) <
-                        0.01
-                    ) {
+                    if (Math.abs(diff) <= AUTO_ROTATE_ACCEL) {
                         idleRef.current.speed = AUTO_ROTATE_TARGET;
-                    } else {
-                        idleRef.current.speed +=
-                            (AUTO_ROTATE_TARGET < 0 ? -1 : 1) * Math.abs(delta);
+                        if (controlsRef.current) {
+                            controlsRef.current.autoRotateSpeed =
+                                AUTO_ROTATE_TARGET;
+                        }
+                        idleRef.current.raf = null;
+                        return;
                     }
 
-                    if (controlsRef.current)
+                    idleRef.current.speed +=
+                        Math.sign(diff) * AUTO_ROTATE_ACCEL;
+                    if (controlsRef.current) {
                         controlsRef.current.autoRotateSpeed =
                             idleRef.current.speed;
+                    }
                     idleRef.current.raf = requestAnimationFrame(step);
                 };
                 idleRef.current.raf = requestAnimationFrame(step);
@@ -219,8 +174,12 @@ function useIdleRotation(controlsRef) {
     }, [resetIdle, controlsRef]);
 }
 
-function useCameraReset(controlsRef, isIntro = false) {
+function useCameraReset(controlsRef, isIntro) {
     const animRef = useRef(null);
+    const isIntroRef = useRef(isIntro);
+    useEffect(() => {
+        isIntroRef.current = isIntro;
+    }, [isIntro]);
 
     const resetCamera = useCallback(
         (targetConfig = null) => {
@@ -233,33 +192,32 @@ function useCameraReset(controlsRef, isIntro = false) {
             const startPos = controls.object.position.clone();
             const startTarget = controls.target.clone();
             const config =
-                targetConfig || (isIntro ? CAM_CONFIG_INTRO : CAM_CONFIG);
+                targetConfig ??
+                (isIntroRef.current ? CAM_CONFIG_INTRO : CAM_CONFIG);
             const endPos = new THREE.Vector3(...config.position);
-            const endTarget = new THREE.Vector3(0, 0, 0);
+            const endTarget = ORIGIN.clone();
 
             const startTime = performance.now();
             const duration = 800;
 
-            function tick(now) {
-                const elapsed = Math.min(1, (now - startTime) / duration);
+            const tick = (now) => {
+                const t = Math.min(1, (now - startTime) / duration);
                 const eased =
-                    elapsed < 0.5
-                        ? 4 * elapsed * elapsed * elapsed
-                        : 1 - Math.pow(-2 * elapsed + 2, 3) / 2;
+                    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
                 controls.object.position.lerpVectors(startPos, endPos, eased);
                 controls.target.lerpVectors(startTarget, endTarget, eased);
                 controls.update();
 
-                if (elapsed < 1) {
+                if (t < 1) {
                     animRef.current = requestAnimationFrame(tick);
                 } else {
                     animRef.current = null;
                 }
-            }
+            };
             animRef.current = requestAnimationFrame(tick);
         },
-        [controlsRef, isIntro]
+        [controlsRef]
     );
 
     useEffect(
@@ -274,43 +232,45 @@ function useCameraReset(controlsRef, isIntro = false) {
 
 function useSimulationWorker(onEvents) {
     const workerRef = useRef(null);
+    const onEventsRef = useRef(onEvents);
+    useEffect(() => {
+        onEventsRef.current = onEvents;
+    }, [onEvents]);
+
     const [isRunning, setIsRunning] = useState(false);
 
-    useEffect(() => {
-        return () => {
-            if (workerRef.current) workerRef.current.terminate();
-        };
-    }, []);
-
-    const run = useCallback(
-        (actor, target) => {
-            setIsRunning(true);
-
-            if (!workerRef.current) {
-                workerRef.current = new Worker(
-                    new URL("../workers/simulatorWorker.js", import.meta.url),
-                    { type: "module" }
-                );
-
-                workerRef.current.onmessage = (e) => {
-                    if (!e.data?.error) {
-                        onEvents(e.data.events || []);
-                    } else {
-                        console.error("Simulation worker error:", e.data.error);
-                    }
-                    setIsRunning(false);
-                };
-
-                workerRef.current.onerror = (err) => {
-                    console.error("Worker failed:", err);
-                    setIsRunning(false);
-                };
-            }
-
-            workerRef.current.postMessage({ actor, target });
+    useEffect(
+        () => () => {
+            workerRef.current?.terminate();
         },
-        [onEvents]
+        []
     );
+
+    const run = useCallback((actor, target) => {
+        setIsRunning(true);
+
+        if (!workerRef.current) {
+            workerRef.current = new Worker(
+                new URL("../workers/simulatorWorker.js", import.meta.url),
+                { type: "module" }
+            );
+            workerRef.current.onerror = (err) => {
+                console.error("Simulation worker failed:", err);
+                setIsRunning(false);
+            };
+        }
+
+        workerRef.current.onmessage = (e) => {
+            if (e.data?.error) {
+                console.error("Simulation worker error:", e.data.error);
+            } else {
+                onEventsRef.current(e.data.events ?? []);
+            }
+            setIsRunning(false);
+        };
+
+        workerRef.current.postMessage({ actor, target });
+    }, []);
 
     return { run, isRunning };
 }
@@ -318,7 +278,7 @@ function useSimulationWorker(onEvents) {
 export default function App() {
     const [isLoading, setIsLoading] = useState(true);
     const [audioLoaded, setAudioLoaded] = useState(false);
-    const [minLoadTimeReached, setMinLoadTimeReached] = useState(false);
+    const [minLoadDone, setMinLoadDone] = useState(false);
     const [showIntro, setShowIntro] = useState(true);
     const [showUI, setShowUI] = useState(false);
     const [events, setEvents] = useState(null);
@@ -334,7 +294,7 @@ export default function App() {
         preserveDrawingBuffer: settings.preserveDrawingBuffer,
     }));
     const [earthTexture, setEarthTexture] = useState(
-        settings.texture || TEXTURES[0]
+        settings.texture ?? TEXTURES[0]
     );
     const [soundEnabled, setSoundEnabled] = useState(
         Boolean(settings.audioEnabled)
@@ -350,43 +310,59 @@ export default function App() {
         return () => clearTimeout(id);
     }, []);
 
-    // Trigger audio initialization on first interaction
     useEffect(() => {
-        const triggerAudioInit = () => {
-            const event = new PointerEvent("pointerdown", { bubbles: true });
-            window.dispatchEvent(event);
-            window.removeEventListener("pointerdown", triggerAudioInit);
-            window.removeEventListener("keydown", triggerAudioInit);
+        const unlock = () =>
+            window.dispatchEvent(
+                new PointerEvent("pointerdown", { bubbles: true })
+            );
+        window.addEventListener("pointerdown", unlock, { once: true });
+        window.addEventListener("keydown", unlock, { once: true });
+        return () => {
+            window.removeEventListener("pointerdown", unlock);
+            window.removeEventListener("keydown", unlock);
         };
-        window.addEventListener("pointerdown", triggerAudioInit, {
-            once: true,
-        });
-        window.addEventListener("keydown", triggerAudioInit, { once: true });
     }, []);
 
     useIdleRotation(controlsRef);
     const resetCamera = useCameraReset(controlsRef, showIntro);
 
-    const introTargetRef = useRef(new THREE.Vector3(-0.23, 0.78, 0.26));
-
-    // Lock intro camera target continuously
     useEffect(() => {
         if (!showIntro) return;
 
-        const lockTarget = () => {
-            if (controlsRef.current) {
-                controlsRef.current.target.copy(introTargetRef.current);
-                controlsRef.current.update();
+        let cleanupFn = null;
+
+        const lock = () => {
+            const controls = controlsRef.current;
+            if (!controls) return;
+            if (!controls.target.equals(INTRO_TARGET)) {
+                controls.target.copy(INTRO_TARGET);
+                controls.update();
             }
         };
 
-        lockTarget();
-        const interval = setInterval(lockTarget, 100);
+        const attach = () => {
+            const controls = controlsRef.current;
+            if (!controls) return false;
+            lock();
+            controls.addEventListener("change", lock);
+            cleanupFn = () => controls.removeEventListener("change", lock);
+            return true;
+        };
 
-        return () => clearInterval(interval);
+        if (!attach()) {
+            const poll = setInterval(() => {
+                if (attach()) clearInterval(poll);
+            }, 50);
+            return () => {
+                clearInterval(poll);
+                cleanupFn?.();
+            };
+        }
+
+        return () => cleanupFn?.();
     }, [showIntro]);
-    const { run, isRunning } = useSimulationWorker(setEvents);
 
+    const { run, isRunning } = useSimulationWorker(setEvents);
     const { visible, currentTick } = useEventTimeline(
         events,
         1000,
@@ -395,65 +371,21 @@ export default function App() {
         tickStep
     );
 
-    const displayTick = currentTick;
-
     const handleEnterSituationRoom = useCallback(() => {
-        // Fade out intro text
-        const introElement = document.querySelector(".intro-content");
-        if (introElement) {
-            introElement.classList.add("fade-out");
-        }
+        const introEl = document.querySelector(".intro-content");
+        introEl?.classList.add("fade-out");
 
-        // After fade, hide intro and animate camera smoothly
         setTimeout(() => {
             setShowIntro(false);
-            // Stagger showUI to trigger fade animation
-            requestAnimationFrame(() => {
-                setShowUI(true);
-            });
-
-            // Animate camera from intro position to normal position
-            if (controlsRef.current) {
-                const startPos = controlsRef.current.object.position.clone();
-                const startTarget = controlsRef.current.target.clone();
-                const endPos = new THREE.Vector3(...CAM_CONFIG.position);
-                const endTarget = new THREE.Vector3(0, 0, 0);
-                const startTime = performance.now();
-                const duration = 1200;
-
-                const animateCamera = (now) => {
-                    const elapsed = Math.min(1, (now - startTime) / duration);
-                    const eased =
-                        elapsed < 0.5
-                            ? 4 * elapsed * elapsed * elapsed
-                            : 1 - Math.pow(-2 * elapsed + 2, 3) / 2;
-
-                    controlsRef.current.object.position.lerpVectors(
-                        startPos,
-                        endPos,
-                        eased
-                    );
-                    controlsRef.current.target.lerpVectors(
-                        startTarget,
-                        endTarget,
-                        eased
-                    );
-                    controlsRef.current.update();
-
-                    if (elapsed < 1) {
-                        requestAnimationFrame(animateCamera);
-                    }
-                };
-                requestAnimationFrame(animateCamera);
-            }
+            requestAnimationFrame(() => setShowUI(true));
+            resetCamera(CAM_CONFIG);
         }, 400);
-    }, [controlsRef]);
+    }, [resetCamera]);
 
     const affectedIsos = useMemo(() => {
         if (!visible.length) return [];
         const isoSet = new Set();
-        for (let i = 0; i < visible.length; i++) {
-            const e = visible[i];
+        for (const e of visible) {
             if (e.from) isoSet.add(e.from.toUpperCase());
             if (e.to) isoSet.add(e.to.toUpperCase());
             if (e.attacker) isoSet.add(e.attacker.toUpperCase());
@@ -464,11 +396,10 @@ export default function App() {
 
     const logDisplay = useMemo(() => {
         if (uiHidden || !visible.length) return "SYSTEM READY";
-
         const recent = visible.slice(-50).reverse();
         return JSON.stringify(
-            recent.map((e) => {
-                const {
+            recent.map(
+                ({
                     fromLat: _fl,
                     fromLon: _flo,
                     toLat: _tl,
@@ -476,9 +407,8 @@ export default function App() {
                     id: _id,
                     intensity: _in,
                     ...rest
-                } = e;
-                return rest;
-            }),
+                }) => rest
+            ),
             null,
             2
         );
@@ -497,30 +427,20 @@ export default function App() {
         [perfSettings]
     );
 
-    const toggleUI = () => setUiHidden((p) => !p);
-    const togglePause = () => setIsPaused((p) => !p);
-
-    // Enforce minimum load time
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setMinLoadTimeReached(true);
-        }, 1500);
-        return () => clearTimeout(timer);
+        const id = setTimeout(() => setMinLoadDone(true), 1500);
+        return () => clearTimeout(id);
     }, []);
 
-    // Hide loading screen when both audio is loaded AND minimum time has passed
     useEffect(() => {
-        if (audioLoaded && minLoadTimeReached) {
-            setIsLoading(false);
-        }
-    }, [audioLoaded, minLoadTimeReached]);
+        if (audioLoaded && minLoadDone) setIsLoading(false);
+    }, [audioLoaded, minLoadDone]);
 
-    // Stable callback for audio loaded event
-    const handleAudioLoaded = useCallback(() => {
-        setAudioLoaded(true);
-    }, []);
+    const handleAudioLoaded = useCallback(() => setAudioLoaded(true), []);
 
-    // Initialize camera based on showIntro state
+    const toggleUI = useCallback(() => setUiHidden((p) => !p), []);
+    const togglePause = useCallback(() => setIsPaused((p) => !p), []);
+
     const initialCamera = showIntro ? CAM_CONFIG_INTRO : CAM_CONFIG;
 
     return (
@@ -568,7 +488,7 @@ export default function App() {
             {!showIntro && (
                 <div className="time-controls">
                     <div className="time-display">
-                        T+{Math.floor(displayTick)}
+                        T+{Math.floor(currentTick)}
                     </div>
                     <button className="hide-ui-button" onClick={toggleUI}>
                         {uiHidden ? "Show UI" : "Hide UI"}
@@ -603,7 +523,6 @@ export default function App() {
                 gl={glConfig}
                 camera={initialCamera}
             >
-                <CameraDebug controlsRef={controlsRef} />
                 <Skybox postEffectsEnabled={postEffectsEnabled} />
                 <Audio
                     enabled={soundEnabled}
@@ -618,13 +537,13 @@ export default function App() {
                             <ArcManager
                                 events={visible}
                                 nations={world.nations}
-                                displayTime={displayTick}
+                                displayTime={currentTick}
                                 simTime={currentTick}
                             />
                             <ExplosionManager
                                 events={visible}
                                 nations={world.nations}
-                                displayTime={displayTick}
+                                displayTime={currentTick}
                             />
                         </>
                     )}
@@ -637,19 +556,15 @@ export default function App() {
                     {showGeo && <CountryBorders />}
 
                     {!showIntro && showGeo && (
-                        <>
-                            <CountryFill
-                                activeIsos={affectedIsos}
-                                nations={world.nations}
-                            />
-                        </>
+                        <CountryFill
+                            activeIsos={affectedIsos}
+                            nations={world.nations}
+                        />
                     )}
                 </Suspense>
 
                 <Globe textureName={earthTexture} />
                 <Atmosphere />
-
-                {/* Show all cities on all screens, including intro and loading */}
                 <Cities nations={world.nations} />
 
                 <OrbitControls

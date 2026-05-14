@@ -598,7 +598,6 @@ body {
     box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
 }
 
-/* Intro Screen Styles */
 .intro-screen {
     position: fixed;
     inset: 0;
@@ -701,7 +700,6 @@ body {
     inset: 0 !important;
 }
 
-/* Fade-in animations for control panels */
 .control-panel-fade {
     position: fixed;
     bottom: 16px;

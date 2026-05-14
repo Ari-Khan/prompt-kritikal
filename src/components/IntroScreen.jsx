@@ -4,7 +4,6 @@ export default function IntroScreen({ onEnter }) {
     const containerRef = useRef(null);
 
     useEffect(() => {
-        // Focus the button on mount for accessibility
         const btn = containerRef.current?.querySelector(".intro-button");
         if (btn) btn.focus();
     }, []);

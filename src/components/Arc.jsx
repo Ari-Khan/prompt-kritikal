@@ -12,55 +12,39 @@ const CONE_GEOM = new THREE.ConeGeometry(0.003, 0.01, 8);
 
 const ArcItem = ({
     id,
-    fromLat,
-    fromLon,
-    toLat,
-    toLon,
-    weapon,
     startTime,
     displayTime,
     simTime,
     impactTick,
+    trajStart,
+    trajEnd,
+    trajDuration,
 }) => {
     const lineRef = useRef();
     const coneRef = useRef();
-    const tempVec = useRef(new THREE.Vector3()).current;
+
+    const tempVec = useMemo(() => new THREE.Vector3(), []);
 
     const data = useMemo(() => {
-        const traj = computeTrajectory({
-            fromLat,
-            fromLon,
-            toLat,
-            toLon,
-            startTime,
-            weapon,
-        });
-
         const seed =
             Number(startTime) +
             (typeof id === "string" ? Number(id.split("-").pop() || 0) : 0);
 
-        const curveData = buildCubicCurveAndGeometry({
-            start: traj.start,
-            end: traj.end,
+        return buildCubicCurveAndGeometry({
+            start: trajStart,
+            end: trajEnd,
             startTime,
             seed,
         });
+    }, [trajStart, trajEnd, startTime, trajDuration, id]);
 
-        return { ...traj, ...curveData };
-    }, [fromLat, fromLon, toLat, toLon, startTime, weapon, id]);
-
-    useEffect(() => {
-        return () => {
-            if (data.geometry) data.geometry.dispose();
-        };
-    }, [data.geometry]);
+    useEffect(() => () => data.geometry?.dispose(), [data.geometry]);
 
     useFrame(() => {
         if (!lineRef.current || !coneRef.current) return;
 
         const delta = displayTime - startTime;
-        const t = Math.max(0, Math.min(1, delta / data.duration));
+        const t = Math.max(0, Math.min(1, delta / trajDuration));
 
         let u = t;
         const arcs = data.arcLengths;
@@ -85,11 +69,9 @@ const ArcItem = ({
 
         if (t < 1) {
             data.curve.getPoint(u, coneRef.current.position);
+
             data.curve.getTangent(u, tempVec);
-            coneRef.current.quaternion.setFromUnitVectors(
-                UP_AXIS,
-                tempVec.normalize()
-            );
+            coneRef.current.quaternion.setFromUnitVectors(UP_AXIS, tempVec);
             coneRef.current.visible = true;
         } else {
             coneRef.current.visible = false;
@@ -127,7 +109,7 @@ const ArcItem = ({
 };
 
 export default function ArcManager({ events, nations, displayTime, simTime }) {
-    const activeEvents = useMemo(() => {
+    const arcDataMap = useMemo(() => {
         if (!events || !nations) return [];
         const result = [];
         for (let i = 0; i < events.length; i++) {
@@ -138,45 +120,57 @@ export default function ArcManager({ events, nations, displayTime, simTime }) {
             const to = nations[e.to];
             if (!from || !to) continue;
 
-            const fLat = e.fromLat ?? from.lat;
-            const fLon = e.fromLon ?? from.lon;
-            const tLat = e.toLat ?? to.lat;
-            const tLon = e.toLon ?? to.lon;
+            const fromLat = e.fromLat ?? from.lat;
+            const fromLon = e.fromLon ?? from.lon;
+            const toLat = e.toLat ?? to.lat;
+            const toLon = e.toLon ?? to.lon;
 
             const traj = computeTrajectory({
-                fromLat: fLat,
-                fromLon: fLon,
-                toLat: tLat,
-                toLon: tLon,
+                fromLat,
+                fromLon,
+                toLat,
+                toLon,
                 startTime: e.t,
                 weapon: e.weapon,
             });
-
             const impactTick = e.t + traj.duration;
 
-            if (simTime >= e.t && simTime <= impactTick + FADE_BUFFER) {
-                result.push({
-                    ...e,
-                    fLat,
-                    fLon,
-                    tLat,
-                    tLon,
-                    impactTick,
-                });
-            }
+            result.push({
+                ...e,
+                fromLat,
+                fromLon,
+                toLat,
+                toLon,
+                impactTick,
+                trajStart: traj.start,
+                trajEnd: traj.end,
+                trajDuration: traj.duration,
+            });
         }
         return result;
-    }, [events, nations, simTime]);
+    }, [events, nations]);
+
+    const activeEvents = useMemo(
+        () =>
+            arcDataMap.filter(
+                (e) => simTime >= e.t && simTime <= e.impactTick + FADE_BUFFER
+            ),
+        [arcDataMap, simTime]
+    );
 
     return (
         <group>
             {activeEvents.map((e) => (
                 <ArcItem
                     key={e.id ?? `${e.from}-${e.to}-${e.t}`}
-                    {...e}
+                    id={e.id}
                     startTime={e.t}
                     displayTime={displayTime}
                     simTime={simTime}
+                    impactTick={e.impactTick}
+                    trajStart={e.trajStart}
+                    trajEnd={e.trajEnd}
+                    trajDuration={e.trajDuration}
                 />
             ))}
         </group>
