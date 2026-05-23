@@ -53,6 +53,7 @@ npm run preview
 
 ## Data & Extensibility
 
+- Logic has been enhanced with AI to ensure realistic conflict simulation and periodic updates to global relations data
 - Add or tweak nations in `src/data/nations.json` (colors, doctrine, powerTier, weapons, majorCities)
 - Edit pairwise affinities in `src/data/bilateral-relations.json` to influence targeting & diplomacy
 - Simulation favors modular changes: change selection logic in `src/sim/targeting.js` or strike behavior in `src/sim/strikes.js`
