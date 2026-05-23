@@ -17,6 +17,19 @@ export default function SmoothZoom({
     const lastPinch = useRef(0);
 
     useEffect(() => {
+        window.__resetZoomVelocity = () => {
+            zoomV.current = 0;
+        };
+        return () => {
+            delete window.__resetZoomVelocity;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!enabled) zoomV.current = 0;
+    }, [enabled]);
+
+    useEffect(() => {
         const el = gl.domElement;
         if (!el || !enabled) return;
 
@@ -35,7 +48,6 @@ export default function SmoothZoom({
                 e.touches[0].clientX - e.touches[1].clientX,
                 e.touches[0].clientY - e.touches[1].clientY
             );
-
             if (e.type === "touchstart") {
                 lastPinch.current = dist;
             } else {

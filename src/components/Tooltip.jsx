@@ -1,20 +1,17 @@
-import { useEffect, useState, useLayoutEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 
 export default function Tooltip({ text, x, y, fadeDuration = 200 }) {
     const [visible, setVisible] = useState(false);
     const [content, setContent] = useState(null);
-    const [pos, setPos] = useState({ x, y });
 
-    useLayoutEffect(() => {
-        if (text) {
-            setPos({ x, y });
-        }
-    }, [text, x, y]);
+    const lastPos = useRef({ x, y });
+    if (text) lastPos.current = { x, y };
 
     useEffect(() => {
         if (text) {
             setContent(text);
+
             const raf = requestAnimationFrame(() => setVisible(true));
             return () => cancelAnimationFrame(raf);
         } else {
@@ -33,12 +30,13 @@ export default function Tooltip({ text, x, y, fadeDuration = 200 }) {
                 position: "fixed",
                 left: 0,
                 top: 0,
-                transform: `translate(${pos.x}px, ${pos.y}px)`,
+                transform: `translate(${lastPos.current.x}px, ${lastPos.current.y}px)`,
                 opacity: visible ? 1 : 0,
                 transition: `opacity ${fadeDuration}ms ease-out`,
                 pointerEvents: "none",
                 zIndex: 9999,
-                willChange: "transform, opacity",
+
+                willChange: "opacity",
             }}
             role="tooltip"
         >
