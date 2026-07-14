@@ -15,13 +15,16 @@ export default function SmoothZoom({
     const { gl, camera } = useThree();
     const zoomV = useRef(0);
     const lastPinch = useRef(0);
+    const isZooming = useRef(false);
 
     useEffect(() => {
         window.__resetZoomVelocity = () => {
             zoomV.current = 0;
         };
+        window.__isZooming = () => isZooming.current;
         return () => {
             delete window.__resetZoomVelocity;
+            delete window.__isZooming;
         };
     }, []);
 
@@ -75,7 +78,12 @@ export default function SmoothZoom({
 
     useFrame((_, delta) => {
         const controls = controlsRef.current;
-        if (!controls || !enabled || Math.abs(zoomV.current) < 0.0001) return;
+        if (!controls || !enabled || Math.abs(zoomV.current) < 0.0001) {
+            isZooming.current = false;
+            return;
+        }
+
+        isZooming.current = true;
 
         const frameDelta = Math.min(delta * 60, 2);
         _offset.copy(camera.position).sub(controls.target);
@@ -94,10 +102,14 @@ export default function SmoothZoom({
 
         _offset.setLength(newDist);
         camera.position.copy(controls.target).add(_offset);
+        const wasAutoRotate = controls.autoRotate;
+        controls.autoRotate = false;
         controls.update();
+        controls.autoRotate = wasAutoRotate;
 
         if (newDist === minDistance || newDist === maxDistance) {
             zoomV.current = 0;
+            isZooming.current = false;
         } else {
             zoomV.current *= Math.pow(decay, frameDelta);
         }

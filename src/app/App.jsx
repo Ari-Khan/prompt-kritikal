@@ -89,10 +89,15 @@ function useIdleRotation(controlsRef) {
             resetIdle();
         };
         window.addEventListener("mousedown", onMouseDown, { passive: true });
-        window.addEventListener("touchstart", resetIdle, { passive: true });
+        const onTouchStart = (e) => {
+            if (e.touches.length !== 1) return;
+            if (e.target?.tagName !== "CANVAS") return;
+            resetIdle();
+        };
+        window.addEventListener("touchstart", onTouchStart, { passive: true });
         return () => {
             window.removeEventListener("mousedown", onMouseDown);
-            window.removeEventListener("touchstart", resetIdle);
+            window.removeEventListener("touchstart", onTouchStart);
         };
     }, [resetIdle]);
 
@@ -103,9 +108,14 @@ function useIdleRotation(controlsRef) {
         let lastDist = controls.object.position.length();
 
         const onControlsChange = () => {
+            if (window.__isZooming?.()) {
+                lastDist = controls.object.position.length();
+                return;
+            }
+            
             const dist = controls.object.position.length();
             const delta = Math.abs(dist - lastDist);
-            if (delta < 0.05) resetIdle();
+            if (delta < 0.05 && !controls.autoRotate) resetIdle();
             lastDist = dist;
         };
 
@@ -118,18 +128,8 @@ function useIdleRotation(controlsRef) {
             const controls = controlsRef.current;
             if (!controls) return;
 
-            const camDist = controls.object.position.length();
             const targetDist = controls.target.distanceTo(ORIGIN);
-
-            const nearSpawnDist =
-                Math.abs(camDist - AUTO_ROTATE_SPAWN_DISTANCE) < 0.3;
             const targetAtOrigin = targetDist < 0.2;
-            const isNearSpawn = nearSpawnDist && targetAtOrigin;
-
-            if (!isNearSpawn && camDist > AUTO_ROTATE_SPAWN_DISTANCE + 0.5) {
-                if (idleRef.current.accelerating) resetIdle();
-                return;
-            }
 
             if (
                 performance.now() - idleRef.current.lastActivity <
@@ -137,7 +137,7 @@ function useIdleRotation(controlsRef) {
             )
                 return;
 
-            if (!idleRef.current.accelerating && isNearSpawn) {
+            if (!idleRef.current.accelerating && targetAtOrigin) {
                 idleRef.current.accelerating = true;
                 idleRef.current.speed = 0;
                 controls.autoRotate = true;
